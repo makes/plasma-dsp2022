@@ -1,0 +1,3 @@
+[submodule "analysator"]
+	path = analysator
+	url = https://github.com/fmihpc/analysator.git
