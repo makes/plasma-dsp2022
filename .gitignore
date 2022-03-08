@@ -3,6 +3,8 @@ data/
 plots/
 
 .DS_Store
+classification-models/
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
