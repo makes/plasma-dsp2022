@@ -1,6 +1,7 @@
 import os
 import sys
 import glob
+import threading
 import numpy as np
 import pandas as pd
 import scipy.stats as scs
@@ -73,6 +74,11 @@ def plot_f_2d(f, ax=None, axis=1,
         xy = [pos[i] for i in range(len(pos)) if i != axis]
         ax.axvline(x=xy[1], color='b', linestyle='-', linewidth=0.5)
         ax.axhline(y=xy[0], color='b', linestyle='-', linewidth=0.5)
+        circ = mpl.patches.Circle((xy[1], xy[0]), 90,
+                                  linewidth=0.5,
+                                  edgecolor='b',
+                                  facecolor='none')
+        ax.add_patch(circ)
 
     if bbox and not trim:
         bbox = get_bbox(f, f != 0)
@@ -115,27 +121,61 @@ def plot_vdf(f, idx, cellid):
     plt.tight_layout()
     plt.savefig(f'plots/f{idx}c{cellid}.png')
 
+def load_f(meta, cell):
+    vcellids, vcellf = jl.readvcells(meta, cell, species="proton")
+    return np.array(jl.Vlasiator.flatten(meta.meshes["proton"], vcellids, vcellf), dtype=np.float64)
+
+def process_f(f, fileIndex, cell):
+    f = transform_f(f)
+    plot_vdf(f, fileIndex, cell)
+
+def process_file(filename, num_cores):
+    print(f'Processing {filename}')
+    vlsv = pt.vlsvfile.VlsvReader(file_name=filename)
+    idx = vlsv.read_parameter('fileIndex')
+    cell_ids = vlsv.read_variable("CellID")
+    cells_with_vdf = [int(id) for id in cell_ids if verifyCellWithVspace(vlsv, id)]
+    print(cells_with_vdf)
+    meta = jl.load(filename)
+    process_f_params = []
+    for cell in cells_with_vdf:
+        print(f'loading cell {cell}')
+        f = load_f(meta, cell)
+        process_f_params.append((f, idx, cell))
+        if len(process_f_params) == num_cores or cell == cells_with_vdf[-1]:
+            threads = []
+            for params in process_f_params:
+                print(f'processing cell {params[2]}')
+                th = threading.Thread(target=process_f, args=params)
+                th.start()
+                threads.append(th)
+            process_f_params = []
+            for th in threads:
+                th.join()
+
+    print(f'Finished processing {filename}')
 
 if __name__ == "__main__":
+    slurmcpus = os.getenv('SLURM_CPUS_PER_TASK')
+    file_idx = None
+    if slurmcpus is not None:
+        print("Running on Slurm")
+        num_cores = int(slurmcpus)
+        file_idx = int(os.environ["SLURM_ARRAY_TASK_ID"])
+        print(f'Slurm task id: {file_idx}')
+    else:
+        num_cores = os.cpu_count()
+
+    print(f'{num_cores} cores detected')
     os.environ['PTNONINTERACTIVE'] = '1'  # suppress messages from analysator
     jl.seval("using Vlasiator")
 
-    plt.ioff()  # interactive mode off
+    mpl.use('agg')  # use non-qt backend for multithreading
 
-    #data_filenames = glob.glob('data/*.vlsv')
-    data_filenames = ['data/bulk.0000015.vlsv']
+    if file_idx is None:
+        data_filenames = glob.glob('data/*.vlsv')
+    else:
+        data_filenames = [f'data/bulk.{file_idx:07}.vlsv']
 
     for filename in data_filenames:
-        print(f'Processing {filename}')
-        vlsv = pt.vlsvfile.VlsvReader(file_name=filename)
-        idx = vlsv.read_parameter('fileIndex')
-        cell_ids = vlsv.read_variable("CellID")
-        #cells_with_vdf = [id for id in cell_ids if verifyCellWithVspace(vlsv, id)]
-        cells_with_vdf = [1101]
-        meta = jl.load(filename)
-        for cell in cells_with_vdf:
-            print(f'processing cell {cell}')
-            vcellids, vcellf = jl.readvcells(meta, cell, species="proton")
-            f = np.array(jl.Vlasiator.flatten(meta.meshes["proton"], vcellids, vcellf), dtype=np.float64)
-            f = transform_f(f)
-            plot_vdf(f, idx, cell)
+        process_file(filename, num_cores)
