@@ -120,6 +120,7 @@ def plot_vdf(f, idx, cellid):
     plot_f_3d(f, ax=ax[1][1])
     plt.tight_layout()
     plt.savefig(f'plots/f{idx}c{cellid}.png')
+    plt.close()
 
 def load_f(meta, cell):
     vcellids, vcellf = jl.readvcells(meta, cell, species="proton")
