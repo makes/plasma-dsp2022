@@ -8,6 +8,8 @@ import scipy.stats as scs
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 
+os.environ['PTNOLATEX'] = '1'
+
 sys.path.insert(0, 'analysator')
 from analysator import pytools as pt
 from analysator.pyPlots.plot_vdf import verifyCellWithVspace
@@ -118,9 +120,10 @@ def plot_vdf(f, idx, cellid):
     ax[1][1].remove()
     ax[1][1] = fig.add_subplot(2,2,4,projection='3d')
     plot_f_3d(f, ax=ax[1][1])
-    plt.tight_layout()
-    plt.savefig(f'plots/f{idx}c{cellid}.png')
-    plt.close()
+    fig.suptitle(f'file: {idx:07} cell: {cellid:05}')
+    fig.tight_layout()
+    fig.savefig(f'plots/f{idx:07}c{cellid:05}.png')
+    plt.close(fig)
 
 def load_f(meta, cell):
     vcellids, vcellf = jl.readvcells(meta, cell, species="proton")
