@@ -150,7 +150,7 @@ def plot(input, output_dir='plots', plot_f=vdf_overview, dpi=300, jobid=None):
             id_num = jobid
             output_dir = output_path(id_num, slurm=True)
             if not os.path.exists(output_dir):
-                os.makedirs(output_path(id_num))
+                os.makedirs(output_dir)
 
 #    output_files = []
 #    for i, cell in enumerate(input_list):
