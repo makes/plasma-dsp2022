@@ -205,6 +205,20 @@ def plot(input, output_dir='plots', plot_f=vdf_overview, dpi=300, jobid=None):
                         dpi=dpi)
             plt.close(fig)
 
+    USE_MULTITHREADING = False
+
+    if not USE_MULTITHREADING:
+        output_files = []
+        for cell in input_list:
+            logger.info(f'loading cell {cell.fileid}:{cell.cellid}')
+            vdf = cell.get_vdf()
+            logger.info(f'processing VDF in cell {vdf.fileid}:{vdf.cellid}')
+            filename = build_output_filename(vdf, output_dir)
+            process_vdf(vdf, filename)
+            output_files.append(filename)
+
+        return output_files
+
     output_files = []
     vdfs = []
     for i, cell in enumerate(input_list):
