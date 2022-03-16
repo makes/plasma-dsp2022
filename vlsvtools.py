@@ -13,35 +13,61 @@ sys.path.insert(0, 'analysator')
 from analysator import pytools as pt
 from analysator.pyPlots.plot_vdf import verifyCellWithVspace
 
-from juliacall import Main as jl
-jl.seval("using Vlasiator")
-
 class VDF:
-    def __init__(self, data, fileid, cellid):
-        self.fileid = fileid
-        self.cellid = cellid
-        self.data = data
+    def __init__(self, cell):
+        self.fileid = cell.fileid
+        self.cellid = cell.cellid
+
+        vlsv = cell.vlsvfile.handle
+
+        velcells = vlsv.read_velocity_cells(self.cellid, pop='proton')
+        vcellids = list(velcells.keys())
+        vcellf = list(velcells.values())
+
+        vblocks = vlsv.get_velocity_mesh_size(pop='proton')
+        vblock_size = vlsv.get_velocity_block_size(pop="proton")
+        self.data = VDF.__reconstruct(vblock_size, vblocks, vcellids, vcellf)
+
+    @classmethod
+    def __reconstruct(cls, vblock_size, vblocks, vcellids, vcellf):
+        def findindex(i, vblocks, vblock_size, blocksize, vsize, sliceBz, sliceCz):
+            iB = (i) // blocksize
+            iBx = iB % vblocks[0]
+            iBy = iB % sliceBz // vblocks[0]
+            iBz = iB // sliceBz
+            iCellInBlock = (i) % blocksize
+            iCx = iCellInBlock % vblock_size[0]
+            iCy = iCellInBlock % sliceCz // vblock_size[0]
+            iCz = iCellInBlock // sliceCz
+            iBCx = iBx*vblock_size[0] + iCx
+            iBCy = iBy*vblock_size[1] + iCy
+            iBCz = iBz*vblock_size[2] + iCz
+            return iBCz*vsize[0]*vsize[1] + iBCy*vsize[0] + iBCx
+
+        vblock_size = np.array(vblock_size)
+        vblocks = np.array(vblocks)
+        blocksize = np.prod(vblock_size)
+        sliceBz = vblocks[0]*vblocks[1]
+        vsize = vblock_size * vblocks
+        sliceCz = vblock_size[0]*vblock_size[1]
+        # Reconstruct the full velocity space
+        VDF = np.zeros(np.prod(vsize))
+        for i in range(len(vcellids)):
+            j = findindex(vcellids[i], vblocks, vblock_size, blocksize, vsize, sliceBz, sliceCz)
+            VDF[int(j)] = vcellf[i]
+        return VDF.reshape(vsize).T
 
     def find_peak(self):
         return np.unravel_index(np.argmax(self.data), self.data.shape)
 
-    def transform_abs(self, inplace=False):
-        if inplace:
-            self.data = np.abs(self.data)
-        else:
-            return VDF(np.abs(self.data), self.fileid, self.cellid)
+    def transform_abs(self):
+        self.data = np.abs(self.data)
 
-    def transform_cbrt(self, inplace=False):
-        if inplace:
-            self.data = np.cbrt(self.data)
-        else:
-            return VDF(np.cbrt(self.data), self.fileid, self.cellid)
+    def transform_cbrt(self):
+        self.data = np.cbrt(self.data)
 
-    def transform_normalize(self, inplace=False):
-        if inplace:
-            self.data = self.data / np.max(self.data)
-        else:
-            return VDF(self.data / np.max(self.data), self.fileid, self.cellid)
+    def transform_normalize(self):
+        self.data = self.data / np.max(self.data)
 
 class VLSVcell:
     def __init__(self, vlsvfile, fileid, cellid, has_vdf, x, y, z):
@@ -54,14 +80,7 @@ class VLSVcell:
         self.z = z
 
     def get_vdf(self):
-        if not self.has_vdf:
-            raise ValueError(f"Cell {self.cellid} does not contain VDF information.")
-        jl_handle = self.vlsvfile.julia_handle
-        vcellids, vcellf = jl.readvcells(jl_handle, self.cellid, species="proton")
-        d = np.array(jl.Vlasiator.flatten(jl_handle.meshes["proton"],
-                                             vcellids,
-                                             vcellf), dtype=np.float32)
-        return VDF(d, self.fileid, self.cellid)
+        return VDF(self)
 
     @property
     def vdf_cells_dict(self):
@@ -84,7 +103,6 @@ class VLSVfile:
             has_vdf = True if cellid in self.vdf_cellids else False
             x, y, z = self.handle.get_cell_coordinates(cellid)
             self.__cells[cellid] = (VLSVcell(self, self.fileid, cellid, has_vdf, x, y, z))
-        self.julia_handle = jl.load(self.filename)
 
     @property
     def cells_dict(self):

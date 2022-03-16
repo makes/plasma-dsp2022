@@ -101,8 +101,8 @@ def plot_3d(f, ax=None, threshold=0.01, intensity=10.0):
 
 
 def vdf_overview(vdf: vlsvtools.VDF):
-    vdf = vdf.transform_abs()
-    vdf = vdf.transform_cbrt()
+    vdf.transform_abs()
+    vdf.transform_cbrt()
 
     peak = vdf.find_peak()
 
@@ -112,7 +112,7 @@ def vdf_overview(vdf: vlsvtools.VDF):
     plot_2d(vdf.data, ax=ax[1][0], pos=peak, axis=2)
     ax[1][1].remove()
     ax[1][1] = fig.add_subplot(2,2,4,projection='3d')
-    vdf = vdf.transform_normalize()
+    vdf.transform_normalize()
     plot_3d(vdf.data, ax=ax[1][1])
     fig.suptitle(f'file: {vdf.fileid:07} cell: {vdf.cellid:05}')
     fig.tight_layout()
@@ -205,7 +205,7 @@ def plot(input, output_dir='plots', plot_f=vdf_overview, dpi=300, jobid=None):
                         dpi=dpi)
             plt.close(fig)
 
-    USE_MULTITHREADING = False
+    USE_MULTITHREADING = True
 
     if not USE_MULTITHREADING:
         output_files = []
