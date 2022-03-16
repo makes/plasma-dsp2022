@@ -2,6 +2,7 @@
 #SBATCH --job-name=plasmaplot    # create a short name for your job
 #SBATCH --output=slurm-%A.%a.out # stdout file
 #SBATCH --error=slurm-%A.%a.err  # stderr file
+#SBATCH --partition=short        # partition
 #SBATCH --nodes=1                # node count
 #SBATCH --ntasks=1               # total number of tasks across all nodes
 #SBATCH --cpus-per-task=4        # number of processes
@@ -12,4 +13,4 @@
 #SBATCH --mail-type=end          # send email when job ends
 #SBATCH --mail-user=yourusername@example.com
 
-python makes-plot-all.py
+python vdfplot.py
