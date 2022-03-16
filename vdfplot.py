@@ -239,7 +239,7 @@ if __name__ == "__main__":
     array_task_id = None
     if os.getenv("SLURM_ARRAY_JOB_ID") != None:
         jobid = int(os.getenv("SLURM_ARRAY_JOB_ID"))
-        array_task_id = int(os.getenv["SLURM_ARRAY_TASK_ID"])
+        array_task_id = int(os.getenv("SLURM_ARRAY_TASK_ID"))
     elif os.getenv("SLURM_JOB_ID") != None:
         jobid = int(os.getenv("SLURM_JOB_ID"))
 
