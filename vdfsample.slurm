@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=vdfplot       # create a short name for your job
+#SBATCH --job-name=vdfsample     # create a short name for your job
 #SBATCH --output=slurm-%A.%a.out # stdout file
 #SBATCH --error=slurm-%A.%a.err  # stderr file
 #SBATCH --partition=test         # partition (test, short, medium, ...)
@@ -13,4 +13,4 @@
 #SBATCH --mail-type=end          # send email when job ends
 #SBATCH --mail-user=yourusername@example.com
 
-python vdfplot.py
+python vdfsample.py
