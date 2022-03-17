@@ -1,11 +1,13 @@
 import os
+import sys
 import logging
 from concurrent.futures import ThreadPoolExecutor
 import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 
-mpl.use('agg')  # multithreading-compatible backend
+if not hasattr(sys, 'ps1'):  # if not in interactive mode
+    mpl.use('agg')  # multithreading-compatible backend
 
 import vlsvtools
 import vdftools
@@ -138,8 +140,8 @@ def plot(input, output_dir=None, plot_f=vdf_overview, dpi=300, jobid=None):
             logger.info(f'processing VDF in cell {vdf.fileid}:{vdf.cellid}')
             fig = plot_f(vdf)
             figs.append(fig)
-        if len(figs) == 1:
-            return figs[0]
+        #if len(figs) == 1:
+        #    return figs[0]
         return figs
 
     # batch run: use multithreading

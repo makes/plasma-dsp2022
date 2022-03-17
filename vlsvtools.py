@@ -2,6 +2,7 @@ import os
 import sys
 import glob
 from collections.abc import Mapping
+import numpy as np
 
 from vdftools import VDF
 
@@ -34,6 +35,10 @@ class VLSVcell(Mapping):
 
     def get_vdf(self):
         return VDF(self)
+
+    @property
+    def coordinates(self):
+        return self.vlsvfile.handle.get_cell_coordinates(self.cellid)
 
     @property
     def vdf_cells(self):
@@ -69,6 +74,15 @@ class VLSVfile(Mapping):
     def has_vdf(self, cellid):
         return self.__cells[cellid].has_vdf
 
+    def get_rho(self):
+        cellids = self.handle.read_variable('cellid')
+        ret = np.zeros([len(self), 4])
+        for i, cellid in enumerate(sorted(cellids)):
+            ret[i, :3] = self.handle.get_cell_coordinates(cellid)
+        rho = self.handle.read_variable('proton/vg_rho')
+        ret[:, 3] = rho[cellids.argsort()]
+        return ret
+
 class VLSVdataset(Mapping):
     def __init__(self, path, filter='*.vlsv'):
         self.filenames = glob.glob(os.path.join(path, filter))
@@ -87,6 +101,9 @@ class VLSVdataset(Mapping):
 
     def __iter__(self):
         return iter(self.__cells)
+
+    def get_rhos(self):
+        return np.array([f.get_rho() for f in self.__files])
 
     @property
     def files(self):
