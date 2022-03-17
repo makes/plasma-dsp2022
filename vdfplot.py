@@ -1,12 +1,15 @@
 import os
 import logging
-from datetime import datetime
-import threading
+from concurrent.futures import ThreadPoolExecutor
 import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 
+mpl.use('agg')  # multithreading-compatible backend
+
 import vlsvtools
+import vdftools
+from misctools import output_subdir, filter_input_list, get_cpus, get_slurm_ids
 
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
@@ -101,8 +104,8 @@ def plot_3d(f, ax=None, threshold=0.01, intensity=10.0):
 
 
 def vdf_overview(vdf: vlsvtools.VDF):
-    vdf.transform_abs()
-    vdf.transform_cbrt()
+    vdf.apply_transform(vdftools.TRANSFORM_ABS)
+    vdf.apply_transform(vdftools.TRANSFORM_CBRT)
 
     peak = vdf.find_peak()
 
@@ -112,67 +115,27 @@ def vdf_overview(vdf: vlsvtools.VDF):
     plot_2d(vdf.data, ax=ax[1][0], pos=peak, axis=2)
     ax[1][1].remove()
     ax[1][1] = fig.add_subplot(2,2,4,projection='3d')
-    vdf.transform_normalize()
+    vdf.apply_transform(vdftools.TRANSFORM_NORMALIZE)
     plot_3d(vdf.data, ax=ax[1][1])
     fig.suptitle(f'file: {vdf.fileid:07} cell: {vdf.cellid:05}')
     fig.tight_layout()
     return fig
 
-def plot(input, output_dir='plots', plot_f=vdf_overview, dpi=300, jobid=None):
-    if isinstance(input, vlsvtools.VDF):
+def plot(input, output_dir=None, plot_f=vdf_overview, dpi=300, jobid=None):
+    if isinstance(input, vdftools.VDF):
         plot_f(input, output_dir)
 
-    input_list = None
-    if isinstance(input, vlsvtools.VLSVcell):
-        input_list = input.vdf_cells
-    if isinstance(input, vlsvtools.VLSVfile):
-        input_list = input.vdf_cells
-    if isinstance(input, vlsvtools.VLSVdataset):
-        input_list = input.vdf_cells
-    if isinstance(input, list):
-        input_list = list(filter(lambda x: x.has_vdf, input))
-    if input_list is None:
-        raise ValueError(f'Invalid input type {type(input)}. Supported types are VDF, VLSVcell, VLSVfile and VLSVdataset')
+    input_list = filter_input_list(input)
 
-    if len(input_list) > 1 and output_dir is not None:
-        date = datetime.today().strftime('%Y%m%d')
-        def output_path(id_num, slurm):
-            id_str = f'{id_num:04}' if not slurm else f'SLURM{id_num}'
-            subdir = f'{plot_f.__name__}_{date}_{id_str}'
-            return os.path.join(output_dir, subdir)
-        if jobid is None:
-            id_num = 1
-            while os.path.exists(output_path(id_num, slurm=False)):
-                id_num += 1
-            output_dir = output_path(id_num, slurm=False)
-            os.makedirs(output_dir)
-        else:
-            id_num = jobid
-            output_dir = output_path(id_num, slurm=True)
-            if not os.path.exists(output_dir):
-                os.makedirs(output_dir)
-
-#    output_files = []
-#    for i, cell in enumerate(input_list):
-#        vdf = cell.get_vdf()
-#        fig = plot_f(vdf)
-#        if output_dir is not None:
-#            filename = f'f{vdf.fileid:07}c{vdf.cellid:05}.png'
-#            f = os.path.join(output_dir, filename)
-#            fig.savefig(f,
-#                        facecolor='white',
-#                        transparent=False,
-#                        dpi=dpi)
-#            plt.close(fig)
-#            output_files.append(f)
-#    return output_files
+    if len(input_list) > 1:
+        output_dir = output_subdir(output_dir, plot_f.__name__, jobid)
 
     if output_dir is None:  # not a batch run
         figs = []
         for cell in input_list:
             logger.info(f'loading cell {cell.fileid}:{cell.cellid}')
             vdf = cell.get_vdf()
-            print(f'processing VDF in cell {vdf.fileid}:{vdf.cellid}')
+            logger.info(f'processing VDF in cell {vdf.fileid}:{vdf.cellid}')
             fig = plot_f(vdf)
             figs.append(fig)
         if len(figs) == 1:
@@ -181,14 +144,7 @@ def plot(input, output_dir='plots', plot_f=vdf_overview, dpi=300, jobid=None):
 
     # batch run: use multithreading
 
-    slurmcpus = os.getenv('SLURM_CPUS_PER_TASK')
-    oscpus = os.cpu_count()
-    if slurmcpus is not None:
-        logger.debug(f"SLURM_CPUS_PER_TASK={slurmcpus} os.cpu_count()={oscpus}")
-        num_cores = int(slurmcpus)
-    else:
-        num_cores = oscpus
-    logger.info(f'{num_cores} cores detected')
+    num_cores = get_cpus()
 
     def build_output_filename(vdf, output_dir):
         if output_dir is None:
@@ -219,26 +175,18 @@ def plot(input, output_dir='plots', plot_f=vdf_overview, dpi=300, jobid=None):
 
         return output_files
 
-    output_files = []
-    vdfs = []
-    for i, cell in enumerate(input_list):
+    def process_cell(cell):
         logger.info(f'loading cell {cell.fileid}:{cell.cellid}')
         vdf = cell.get_vdf()
-        vdfs.append(vdf)
-        if len(vdfs) == num_cores or i == len(input_list) - 1:
-            threads = []
-            for vdf in vdfs:
-                logger.info(f'processing VDF in cell {vdf.fileid}:{vdf.cellid}')
-                filename = build_output_filename(vdf, output_dir)
-                output_files.append(filename)
-                th = threading.Thread(target=process_vdf, args=[vdf, filename])
-                th.start()
-                threads.append(th)
-            vdfs = []
-            for th in threads:
-                th.join()
+        filename = build_output_filename(vdf, output_dir)
+        logger.info(f'processing VDF in cell {vdf.fileid}:{vdf.cellid}')
+        process_vdf(vdf, filename)
+        return filename
 
-    return output_files
+    with ThreadPoolExecutor(max_workers=num_cores) as executor:
+        output_files = executor.map(process_cell, input_list)
+
+    return list(output_files)
 
 if __name__ == "__main__":
     import argparse
@@ -249,19 +197,14 @@ if __name__ == "__main__":
     #parser.add_argument('--jobid', type=int, help='jobid')
     args = parser.parse_args()
 
-    jobid = None
-    array_task_id = None
-    if os.getenv("SLURM_ARRAY_JOB_ID") != None:
-        jobid = int(os.getenv("SLURM_ARRAY_JOB_ID"))
-        array_task_id = int(os.getenv("SLURM_ARRAY_TASK_ID"))
-    elif os.getenv("SLURM_JOB_ID") != None:
-        jobid = int(os.getenv("SLURM_JOB_ID"))
+    jobid, array_task_id = get_slurm_ids()
 
     input = vlsvtools.VLSVdataset(args.inputdir)
 
-    # TODO: parallelize by file for ARRAY_JOB
     if array_task_id is not None:
         logger.debug(f'SLURM_ARRAY_TASK_ID={array_task_id}')
         input = input.files[array_task_id]
+
+    input = input.vdf_cells
 
     plot(input, output_dir=args.outputdir, jobid=jobid)
