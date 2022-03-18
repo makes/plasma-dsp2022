@@ -52,24 +52,39 @@ class VLSVcell(Mapping):
         ret = [self] if self.has_vdf else []
         return ret
 
+class SpatialMesh:
+    def __init__(self, handle):
+        self.shape = np.flip(handle.get_spatial_mesh_size())
+        self.unsorted_cellids = handle.read_variable('cellid').astype(int).tolist()
+        self.cellids = sorted(self.unsorted_cellids)
+
+        hasvdf = verifyCellWithVspace
+        firstids = [cellid for cellid in self.cellids[:300] if hasvdf(handle, cellid)]
+        assert len(firstids) >= 2
+        self.vdf_spacing = firstids[1] - firstids[0]
+
+    @property
+    def cellid_matrix(self):
+        return self.cellids.reshape(self.shape)
+
+    @property
+    def vdfcellids(self):
+        s = self.vdf_spacing
+        return self.cellid_matrix[::s,::s,::s].flatten()
+
 class VLSVfile(Mapping):
     def __init__(self, filename):
         self.filename = filename
         self.handle = pt.vlsvfile.VlsvReader(file_name=filename)
         self.fileid = self.handle.read_parameter('fileindex')
-        self.cellids = sorted(self.handle.read_variable('cellid').astype(int).tolist())
+        self.spatial_mesh = SpatialMesh(self.handle)
         logger.info(f'Found {len(self.cellids)} cells in {self.filename}')
-
-        def find_vdfcellids(handle, cellids):
-            hasvdf = verifyCellWithVspace
-            firstids = [cellid for cellid in cellids[:300] if hasvdf(handle, cellid)]
-            diff = firstids[1] - firstids[0]
-            return list(range(firstids[0], len(cellids), diff))
-        self.vdfcellids = find_vdfcellids(self.handle, self.cellids)
+        logger.info(f'Found VDF data in {len(self.vdfcellids)} cells')
 
         self.__cells = {}
         for cellid in self.cellids:
             self.__cells[cellid] = VLSVcell(self, self.fileid, cellid, cellid in self.vdfcellids)
+        self.__mesh_size = self.handle.get_spatial_mesh_size()
 
     def __getitem__(self, key):
         return self.__cells[key]
@@ -81,8 +96,20 @@ class VLSVfile(Mapping):
         return iter(self.__cells)
 
     @property
+    def cellids(self):
+        return self.spatial_mesh.cellids
+
+    @property
+    def vdfcellids(self):
+        return self.spatial_mesh.vdfcellids
+
+    @property
     def vdf_cells(self):
         return [cell for cell in self.values() if cell.has_vdf]
+
+    @property
+    def mesh_size(self):
+        return self.__mesh_size
 
     def get_vdf(self, cellid):
         return self.__cells[cellid].get_vdf()
