@@ -55,8 +55,9 @@ class VLSVcell(Mapping):
 class SpatialMesh:
     def __init__(self, handle):
         self.shape = np.flip(handle.get_spatial_mesh_size())
-        self.unsorted_cellids = handle.read_variable('cellid').astype(int).tolist()
-        self.cellids = sorted(self.unsorted_cellids)
+        self.unsorted_cellids = handle.read_variable('cellid').astype(int)
+        self.cellids = np.copy(self.unsorted_cellids)
+        self.cellids.sort()
 
         hasvdf = verifyCellWithVspace
         firstids = [cellid for cellid in self.cellids[:300] if hasvdf(handle, cellid)]
