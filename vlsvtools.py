@@ -64,7 +64,7 @@ class VLSVfile(Mapping):
             hasvdf = verifyCellWithVspace
             firstids = [cellid for cellid in cellids[:300] if hasvdf(handle, cellid)]
             diff = firstids[1] - firstids[0]
-            return list(range(firstids[0], diff, len(cellids)))
+            return list(range(firstids[0], len(cellids), diff))
         self.vdfcellids = find_vdfcellids(self.handle, self.cellids)
 
         self.__cells = {}
