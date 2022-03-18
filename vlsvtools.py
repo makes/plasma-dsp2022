@@ -4,7 +4,7 @@ import glob
 from collections.abc import Mapping
 import numpy as np
 
-from vdftools import VDF
+from vdftools import VDF, POPULATION
 
 PYTHON_INTERACTIVE_MODE = hasattr(sys, 'ps1')
 
@@ -79,7 +79,7 @@ class VLSVfile(Mapping):
         ret = np.zeros([len(self), 4])
         for i, cellid in enumerate(sorted(cellids)):
             ret[i, :3] = self.handle.get_cell_coordinates(cellid)
-        rho = self.handle.read_variable('proton/vg_rho')
+        rho = self.handle.read_variable(f'{POPULATION}/vg_rho')
         ret[:, 3] = rho[cellids.argsort()]
         return ret
 

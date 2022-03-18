@@ -5,6 +5,8 @@ import numpy as np
 sys.path.insert(0, 'analysator')
 from analysator import pytools as pt
 
+POPULATION = 'proton'
+
 class VDFtransform:
     def __init__(self, transform_func, name):
         self.transform_func = transform_func
@@ -19,14 +21,14 @@ class VDF:
 
         vlsv = pt.vlsvfile.VlsvReader(file_name=self.filename)
 
-        velcells = vlsv.read_velocity_cells(self.cellid, pop='proton')
+        velcells = vlsv.read_velocity_cells(self.cellid, pop=POPULATION)
         if not velcells:
             raise ValueError(f'No velocity data found for cell {self.fileid}:{self.cellid}')
         vcellids = list(velcells.keys())
         vcellf = list(velcells.values())
 
-        vblocks = vlsv.get_velocity_mesh_size(pop='proton')
-        vblock_size = vlsv.get_velocity_block_size(pop="proton")
+        vblocks = vlsv.get_velocity_mesh_size(pop=POPULATION)
+        vblock_size = vlsv.get_velocity_block_size(pop=POPULATION)
         self.data = VDF.__reconstruct(vblock_size, vblocks, vcellids, vcellf)
 
     @classmethod
