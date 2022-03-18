@@ -1,6 +1,7 @@
 import os
 import sys
 import glob
+import logging
 from collections.abc import Mapping
 import numpy as np
 
@@ -15,6 +16,10 @@ os.environ['PTNOLATEX'] = '1'  # Latex rendering doesn't work with multithreadin
 sys.path.insert(0, 'analysator')
 from analysator import pytools as pt
 from analysator.pyPlots.plot_vdf import verifyCellWithVspace
+
+logging.basicConfig(level=logging.WARNING)
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 class VLSVcell(Mapping):
     def __init__(self, vlsvfile, fileid, cellid):
@@ -51,6 +56,7 @@ class VLSVfile(Mapping):
         self.handle = pt.vlsvfile.VlsvReader(file_name=filename)
         self.fileid = self.handle.read_parameter('fileindex')
         self.cellids = sorted(self.handle.read_variable('cellid').astype(int).tolist())
+        logger.info(f'Found {len(self.cellids)} cells in {self.filename}')
         self.__cells = {}
         for cellid in self.cellids:
             self.__cells[cellid] = VLSVcell(self, self.fileid, cellid)
@@ -86,6 +92,7 @@ class VLSVfile(Mapping):
 class VLSVdataset(Mapping):
     def __init__(self, path, filter='*.vlsv'):
         self.filenames = glob.glob(os.path.join(path, filter))
+        logger.info(f'Found {len(self.filenames)} files.')
         self.__files = [VLSVfile(f) for f in self.filenames]
         self.__files = sorted(self.__files, key=lambda f: f.fileid)
         self.__cells = {}
