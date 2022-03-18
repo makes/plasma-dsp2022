@@ -22,12 +22,12 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 class VLSVcell(Mapping):
-    def __init__(self, vlsvfile, fileid, cellid):
+    def __init__(self, vlsvfile, fileid, cellid, has_vdf):
         self.vlsvfile = vlsvfile
         self.fileid = fileid
         self.cellid = cellid
-        self.has_vdf = verifyCellWithVspace(vlsvfile.handle, cellid)
-        self.x, self.y, self.z = vlsvfile.handle.get_cell_coordinates(cellid)
+        self.has_vdf = has_vdf
+        self.__spatial_coords = None
 
     def __getitem__(self, key):
         return {self.cellid: self}[key]
@@ -43,7 +43,9 @@ class VLSVcell(Mapping):
 
     @property
     def coordinates(self):
-        return self.vlsvfile.handle.get_cell_coordinates(self.cellid)
+        if self.__spatial_coords is None:
+            self.__spatial_coords = self.vlsvfile.handle.get_cell_coordinates(self.cellid)
+        return self.__spatial_coords
 
     @property
     def vdf_cells(self):
@@ -57,9 +59,17 @@ class VLSVfile(Mapping):
         self.fileid = self.handle.read_parameter('fileindex')
         self.cellids = sorted(self.handle.read_variable('cellid').astype(int).tolist())
         logger.info(f'Found {len(self.cellids)} cells in {self.filename}')
+
+        def find_vdfcellids(handle, cellids):
+            hasvdf = verifyCellWithVspace
+            firstids = [cellid for cellid in cellids[:300] if hasvdf(handle, cellid)]
+            diff = firstids[1] - firstids[0]
+            return list(range(firstids[0], diff, len(cellids)))
+        self.vdfcellids = find_vdfcellids(self.handle, self.cellids)
+
         self.__cells = {}
         for cellid in self.cellids:
-            self.__cells[cellid] = VLSVcell(self, self.fileid, cellid)
+            self.__cells[cellid] = VLSVcell(self, self.fileid, cellid, cellid in self.vdfcellids)
 
     def __getitem__(self, key):
         return self.__cells[key]
