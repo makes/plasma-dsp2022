@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 
 if not hasattr(sys, 'ps1'):  # if not in interactive mode
     mpl.use('agg')  # multithreading-compatible backend
+    plt.ioff()
 
 import vlsvtools
 import vdftools
@@ -178,11 +179,15 @@ def plot(input, output_dir=None, plot_f=vdf_overview, dpi=300, jobid=None):
         return output_files
 
     def process_cell(cell):
+        filename = build_output_filename(vdf, output_dir)
+        if os.path.exists(filename):
+            logger.info(f'{filename} exists. Skipping.')
+            return filename
         logger.info(f'loading cell {cell.fileid}:{cell.cellid}')
         vdf = cell.get_vdf()
-        filename = build_output_filename(vdf, output_dir)
         logger.info(f'processing VDF in cell {vdf.fileid}:{vdf.cellid}')
         process_vdf(vdf, filename)
+        del vdf
         return filename
 
     with ThreadPoolExecutor(max_workers=num_cores) as executor:
