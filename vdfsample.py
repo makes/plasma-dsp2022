@@ -98,7 +98,11 @@ class VDFsampler:
         logger.info(f'sampling cell {cell.fileid}:{cell.cellid}')
         data = {}
         data['ids'] = np.array([cell.fileid, cell.cellid])
-        vdf = cell.get_vdf()
+        try:
+            vdf = cell.get_vdf()
+        except ValueError as e:
+            logger.warning(f'{e}')
+            return
         for t in transforms:
             vdf.apply_transform(t)
         peak = vdf.find_peak()

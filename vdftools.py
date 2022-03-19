@@ -5,7 +5,7 @@ import numpy as np
 sys.path.insert(0, 'analysator')
 from analysator import pytools as pt
 
-POPULATION = 'proton'
+POPULATION = 'avgs'
 
 class VDFtransform:
     def __init__(self, transform_func, name):

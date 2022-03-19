@@ -11,10 +11,13 @@ logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
-SAMPLEPATH = 'samples/vdfsample_20220317_SLURM71721393'
-IMGPATH = 'plots/vdf_overview_20220317_SLURM71721410'
-DATAPATH = 'data'
-CSVFILE = 'output/vdfsample_20220317_SLURM71721393.csv'
+SAMPLEPATH = 'samples/2D_magnetosphere'
+#SAMPLEPATH = 'samples/vdfsample_20220317_SLURM71721393'
+#IMGPATH = 'plots/vdf_overview_20220317_SLURM71721410'
+DATAPATH = '2D_magnetosphere'
+#DATAPATH = 'data'
+CSVFILE = 'samples/2D_magnetosphere/2D_magnetosphere.csv'
+#CSVFILE = 'output/vdfsample_20220317_SLURM71721393.csv'
 
 def generate_feature_zeros(row):
     zeros = 0
