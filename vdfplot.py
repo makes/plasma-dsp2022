@@ -179,7 +179,7 @@ def plot(input, output_dir=None, plot_f=vdf_overview, dpi=300, jobid=None):
         return output_files
 
     def process_cell(cell):
-        filename = build_output_filename(vdf, output_dir)
+        filename = build_output_filename(cell, output_dir)
         if os.path.exists(filename):
             logger.info(f'{filename} exists. Skipping.')
             return filename
