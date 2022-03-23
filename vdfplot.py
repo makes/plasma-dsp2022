@@ -164,7 +164,7 @@ def plot(input, output_dir=None, plot_f=vdf_overview, dpi=300, jobid=None):
                         dpi=dpi)
             plt.close(fig)
 
-    USE_MULTITHREADING = True
+    USE_MULTITHREADING = False
 
     if not USE_MULTITHREADING:
         output_files = []
