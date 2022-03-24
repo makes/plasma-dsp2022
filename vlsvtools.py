@@ -15,11 +15,23 @@ if not PYTHON_INTERACTIVE_MODE or SUPPRESS_ANALYSATOR_MESSAGES:
 os.environ['PTNOLATEX'] = '1'  # Latex rendering doesn't work with multithreading
 sys.path.insert(0, 'analysator')
 from analysator import pytools as pt
-from analysator.pyPlots.plot_vdf import verifyCellWithVspace
 
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
+
+# analysator.pyPlots.plot_vdf.verifyCellWithVspace does not filter out
+# 0-size VDFs that occur inside earth so we need this to see if cell actually
+# has VDF blocks.
+def cell_has_vdf(handle, cellid, pop):
+    cellswithblocks = np.atleast_1d(handle.read(mesh="SpatialGrid",
+                                                tag="CELLSWITHBLOCKS",
+                                                name=pop))
+    blockspercell = np.atleast_1d(handle.read(mesh="SpatialGrid",
+                                              tag="BLOCKSPERCELL",
+                                              name=pop))
+    emptycells = cellswithblocks[np.where(blockspercell == 0)[0]]
+    return cellid in cellswithblocks and cellid not in emptycells
 
 class VLSVcell(Mapping):
     def __init__(self, vlsvfile, fileid, cellid, has_vdf):
@@ -63,8 +75,8 @@ class SpatialMesh:
         self.cellids = np.copy(self.unsorted_cellids)
         self.cellids.sort()
 
-        hasvdf = verifyCellWithVspace
-        firstids = [cellid for cellid in self.cellids[:300] if hasvdf(handle, cellid)]
+        pop = handle.active_populations[0]
+        firstids = [cellid for cellid in self.cellids[:300] if cell_has_vdf(handle, cellid, pop)]
         assert len(firstids) >= 2
         self.vdf_spacing = firstids[1] - firstids[0]
 
@@ -85,8 +97,9 @@ class VLSVfile(Mapping):
         self.spatial_mesh = SpatialMesh(self.handle)
         logger.info(f'Found {len(self.cellids)} cells in {self.filename}')
 
+        pop = self.populations[0]
         self.__vdfcellids = [cellid for cellid in self.spatial_mesh.vdfcellids
-                             if verifyCellWithVspace(self.handle, cellid)]
+                             if cell_has_vdf(self.handle, cellid, pop)]
 
         logger.info(f'Found VDF data in {len(self.__vdfcellids)} cells')
 
