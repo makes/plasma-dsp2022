@@ -20,6 +20,7 @@ logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
+
 # analysator.pyPlots.plot_vdf.verifyCellWithVspace does not filter out
 # 0-size VDFs that occur inside earth so we need this to see if cell actually
 # has VDF blocks.
@@ -32,6 +33,7 @@ def cell_has_vdf(handle, cellid, pop):
                                               name=pop))
     emptycells = cellswithblocks[np.where(blockspercell == 0)[0]]
     return cellid in cellswithblocks and cellid not in emptycells
+
 
 class VLSVcell(Mapping):
     def __init__(self, vlsvfile, fileid, cellid, has_vdf):
@@ -68,6 +70,7 @@ class VLSVcell(Mapping):
         ret = [self] if self.has_vdf else []
         return ret
 
+
 class SpatialMesh:
     def __init__(self, handle):
         self.shape = np.flip(handle.get_spatial_mesh_size())
@@ -88,6 +91,7 @@ class SpatialMesh:
     def vdfcellids(self):
         s = self.vdf_spacing
         return self.cellid_matrix[::s,::s,::s].flatten()
+
 
 class VLSVfile(Mapping):
     def __init__(self, filename):
@@ -159,6 +163,7 @@ class VLSVfile(Mapping):
         ret[:, 3] = rho[cellids.argsort()]
         return ret
 
+
 class VLSVfiles(Mapping):
     def __init__(self, filenames):
         self.filenames = filenames
@@ -175,17 +180,12 @@ class VLSVfiles(Mapping):
     def __iter__(self):
         return self.__files.__iter__()
 
+
 class VLSVdataset(Mapping):
     def __init__(self, path, filter='*.vlsv'):
         self.filenames = glob.glob(os.path.join(path, filter))
         logger.info(f'Found {len(self.filenames)} files.')
         self.__files = VLSVfiles(self.filenames)
-        #self.__files = [VLSVfile(f) for f in self.filenames]
-        #self.__files = sorted(self.__files, key=lambda f: f.fileid)
-        #self.__cells = {}
-        #for f in self.__files:
-        #    for cell in f.values():
-        #        self.__cells[(f.fileid, cell.cellid)] = cell
 
     def __getitem__(self, key):
         if len(key) == 1:
@@ -209,7 +209,7 @@ class VLSVdataset(Mapping):
 
     @property
     def files(self):
-        return self.__files
+        return list(self.__files.values())
 
     @property
     def fileids(self):

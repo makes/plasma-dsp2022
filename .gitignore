@@ -1,6 +1,10 @@
 data/
 data
 2D_magnetosphere
+1D_shock_perpendicular
+
+output/**
+
 plots/
 samples/
 
