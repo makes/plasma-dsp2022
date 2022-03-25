@@ -162,10 +162,9 @@ class VLSVfile(Mapping):
 class VLSVfiles(Mapping):
     def __init__(self, filenames):
         self.filenames = filenames
-        self.__files = {}
-        for filename in filenames:
-            file = VLSVfile(filename)
-            self.__files[file.fileid] = file
+        files = [VLSVfile(filename) for filename in filenames]
+        files = sorted(files, key=lambda f: f.fileid)
+        self.__files = {f.fileid: f for f in files}
 
     def __getitem__(self, key):
         return self.__files[key]
