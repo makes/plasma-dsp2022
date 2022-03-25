@@ -131,7 +131,8 @@ def plot(input, output_dir=None, plot_f=vdf_overview, dpi=300, jobid=None):
     input_list = filter_input_list(input)
 
     if len(input_list) > 1:
-        output_dir = output_subdir(output_dir, plot_f.__name__, jobid)
+        #output_dir = output_subdir(output_dir, plot_f.__name__, jobid)
+        output_dir = os.path.join(output_dir, plot_f.__name__)
 
     if output_dir is None:  # not a batch run
         figs = []
@@ -164,15 +165,18 @@ def plot(input, output_dir=None, plot_f=vdf_overview, dpi=300, jobid=None):
                         dpi=dpi)
             plt.close(fig)
 
-    USE_MULTITHREADING = False
+    USE_MULTITHREADING = True
 
     if not USE_MULTITHREADING:
         output_files = []
         for cell in input_list:
+            filename = build_output_filename(cell, output_dir)
+            if os.path.exists(filename):
+                logger.info(f'{filename} exists. Skipping.')
+                return filename
             logger.info(f'loading cell {cell.fileid}:{cell.cellid}')
             vdf = cell.get_vdf()
             logger.info(f'processing VDF in cell {vdf.fileid}:{vdf.cellid}')
-            filename = build_output_filename(vdf, output_dir)
             process_vdf(vdf, filename)
             output_files.append(filename)
 

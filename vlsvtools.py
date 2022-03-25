@@ -159,19 +159,43 @@ class VLSVfile(Mapping):
         ret[:, 3] = rho[cellids.argsort()]
         return ret
 
+class VLSVfiles(Mapping):
+    def __init__(self, filenames):
+        self.filenames = filenames
+        self.__files = {}
+        for filename in filenames:
+            file = VLSVfile(filename)
+            self.__files[file.fileid] = file
+
+    def __getitem__(self, key):
+        return self.__files[key]
+
+    def __len__(self):
+        return len(self.__files)
+
+    def __iter__(self):
+        return self.__files.__iter__()
+
 class VLSVdataset(Mapping):
     def __init__(self, path, filter='*.vlsv'):
         self.filenames = glob.glob(os.path.join(path, filter))
         logger.info(f'Found {len(self.filenames)} files.')
-        self.__files = [VLSVfile(f) for f in self.filenames]
-        self.__files = sorted(self.__files, key=lambda f: f.fileid)
+        self.__files = VLSVfiles(self.filenames)
+        #self.__files = [VLSVfile(f) for f in self.filenames]
+        #self.__files = sorted(self.__files, key=lambda f: f.fileid)
         #self.__cells = {}
         #for f in self.__files:
         #    for cell in f.values():
         #        self.__cells[(f.fileid, cell.cellid)] = cell
 
     def __getitem__(self, key):
-        return self.__files[key[0]][key[1]]
+        if len(key) == 1:
+            return self.__files[key]
+        elif len(key) == 2:
+            print(key[0], key[1])
+            return self.__files[key[0]][key[1]]
+        else:
+            raise KeyError("Invalid key")
 
     def __len__(self):
         return sum(len(f) for f in self.__files)
