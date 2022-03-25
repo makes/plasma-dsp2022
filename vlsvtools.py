@@ -206,7 +206,7 @@ class VLSVdataset(Mapping):
                 yield self.__files[fileindex].__getitem__(cellid)
 
     def get_rhos(self):
-        return np.array([f.get_rho() for f in self.__files])
+        return np.array([f.get_rho() for f in self.__files.values()])
 
     @property
     def files(self):
@@ -214,7 +214,7 @@ class VLSVdataset(Mapping):
 
     @property
     def fileids(self):
-        return [f.fileid for f in self.__files]
+        return [f.fileid for f in self.__files.keys()]
 
     @property
     def vdf_cells(self):
