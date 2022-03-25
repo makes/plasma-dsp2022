@@ -7,7 +7,6 @@ import pandas as pd
 import vlsvtools
 import vdfsample
 
-from juliacall import Main as jl
 
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
@@ -86,32 +85,45 @@ def collect_dataframe(samples, vlsvdata):
         row['spatial_x'], row['spatial_y'], row['spatial_z'] = x, y, z
 
         if 'rho' in cell.vlsvfile.handle.get_all_variables():
-            row['rho'] = cell.vlsvfile.handle.read_variable('rho', sample.cellid)
-        if f'{cell.populations[0]}/vg_rho' in cell.vlsvfile.handle.get_all_variables():
-            row['rho'] = cell.vlsvfile.handle.read_variable(f'{cell.populations[0]}/vg_rho', sample.cellid)
 
-        jl.seval("using Vlasiator")
-        meta = jl.load(cell.vlsvfile.filename)
-        vcellids, vcellf = jl.readvcells(meta, int(sample.cellid), species=cell.populations[0])
+            m0_density = cell.vlsvfile.handle.read_variable('rho', sample.cellid)
+        elif f'{cell.populations[0]}/vg_rho' in cell.vlsvfile.handle.get_all_variables():
+            m0_density = cell.vlsvfile.handle.read_variable(f'{cell.populations[0]}/vg_rho', sample.cellid)
+        row['m0_density'] = m0_density
 
-        m0_density = jl.getdensity(meta, vcellids, vcellf, species=cell.populations[0])
-
-        m1_velocity = jl.getvelocity(meta, vcellids, vcellf, species=cell.populations[0])
+        if 'rho_v' in cell.vlsvfile.handle.get_all_variables():
+            m1_velocity = cell.vlsvfile.handle.read_variable('rho_v', sample.cellid) / m0_density
+        elif f'{cell.populations[0]}/vg_v' in cell.vlsvfile.handle.get_all_variables():
+            m1_velocity = cell.vlsvfile.handle.read_variable(f'{cell.populations[0]}/vg_v', sample.cellid)
         row['m1_velocity_0'] = m1_velocity[0]
         row['m1_velocity_1'] = m1_velocity[1]
         row['m1_velocity_2'] = m1_velocity[2]
+        row['m1_speed'] = np.linalg.norm(m1_velocity)
 
-        m2_pressure = jl.getpressure(meta, vcellids, vcellf, species=cell.populations[0])
-        row['m2_pressure_0'] = m2_pressure[0]
-        row['m2_pressure_1'] = m2_pressure[1]
-        row['m2_pressure_2'] = m2_pressure[2]
-        row['m2_pressure_3'] = m2_pressure[3]
-        row['m2_pressure_4'] = m2_pressure[4]
-        row['m2_pressure_5'] = m2_pressure[5]
+        if 'PTensorDiagonal' in cell.vlsvfile.handle.get_all_variables():
+            m2_pressure_diag = cell.vlsvfile.handle.read_variable('PTensorDiagonal', sample.cellid)
+        elif f'{cell.populations[0]}/vg_ptensor_diagonal' in cell.vlsvfile.handle.get_all_variables():
+            m2_pressure_diag = cell.vlsvfile.handle.read_variable(f'{cell.populations[0]}/vg_ptensor_diagonal', sample.cellid)
 
-        row['m0_density'] = m0_density
-        row['m1_velocity'] = np.linalg.norm(m1_velocity)
-        row['m2_pressure'] = np.linalg.norm(m2_pressure)
+        if 'PTensorOffDiagonal' in cell.vlsvfile.handle.get_all_variables():
+            m2_pressure_offdiag = cell.vlsvfile.handle.read_variable('PTensorOffDiagonal', sample.cellid)
+        elif f'{cell.populations[0]}/vg_ptensor_offdiagonal' in cell.vlsvfile.handle.get_all_variables():
+            m2_pressure_offdiag = cell.vlsvfile.handle.read_variable(f'{cell.populations[0]}/vg_ptensor_offdiagonal', sample.cellid)
+
+        row['m2_pressure_diag_0'] = m2_pressure_diag[0]
+        row['m2_pressure_diag_1'] = m2_pressure_diag[1]
+        row['m2_pressure_diag_2'] = m2_pressure_diag[2]
+        row['m2_pressure_offdiag_0'] = m2_pressure_offdiag[0]
+        row['m2_pressure_offdiag_1'] = m2_pressure_offdiag[1]
+        row['m2_pressure_offdiag_2'] = m2_pressure_offdiag[2]
+
+        #from juliacall import Main as jl
+        #jl.seval("using Vlasiator")
+        #meta = jl.load("filename.vlsv")
+        #vcellids, vcellf = jl.readvcells(meta, int(1101), species='proton')
+        #d = jl.getdensity(meta, vcellids, vcellf, species='proton')
+        #v = jl.getvelocity(meta, vcellids, vcellf, species='proton')
+        #p = jl.getpressure(meta, vcellids, vcellf, species='proton')
 
         row['pngfile'] = f'f{sample.fileid:07}c{sample.cellid:05}.png'
 
