@@ -191,7 +191,7 @@ class VLSVdataset(Mapping):
         if len(key) == 1:
             return self.__files[key]
         elif len(key) == 2:
-            print(key[0], key[1])
+
             return self.__files[key[0]][key[1]]
         else:
             raise KeyError("Invalid key")
@@ -217,5 +217,5 @@ class VLSVdataset(Mapping):
 
     @property
     def vdf_cells(self):
-        t = [f.vdf_cells for f in self.__files]
+        t = [f.vdf_cells for f in self.__files.values()]
         return [cell for cells in t for cell in cells]
