@@ -12,6 +12,13 @@ class VDFtransform:
 
 class VDF:
     def __init__(self, cell):
+        if cell is None:
+            self.filename = ''
+            self.fileid = 0
+            self.cellid = 0
+            self.data = None
+            self.transforms = []
+
         self.filename = cell.vlsvfile.filename
         self.fileid = cell.fileid
         self.cellid = cell.cellid
