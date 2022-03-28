@@ -18,6 +18,7 @@ class VDF:
             self.cellid = 0
             self.data = None
             self.transforms = []
+            return
 
         self.filename = cell.vlsvfile.filename
         self.fileid = cell.fileid
