@@ -2,6 +2,11 @@ import os
 import sys
 from datetime import datetime
 import logging
+import numpy as np
+
+sys.path.insert(0, 'analysator')
+from analysator.pyCalculations.rotation import rotation_array_matrix
+import scipy.spatial.transform
 
 import vlsvtools
 
@@ -67,3 +72,27 @@ def filter_input_list(input):
     if input_list is None:
         raise ValueError(f'Invalid input type {type(input)}. Supported types are VDF, VLSVcell, VLSVfile and VLSVdataset')
     return input_list
+
+def rotateArrayVectorToVector(vector1, vector2, axis=2):
+    ''' Applies rotation matrix that would rotate vector2 to z-axis on vector1 and then returns the rotated vector1. This is the fuction rotateVectorToVector from https://github.com/fmihpc/analysator/blob/master/pyCalculations/rotation.py modified to support NumPy vectorization.
+        :param vector1        Vector to be rotated
+        :param vector2        Vector for creating the rotation matrix
+        :returns rotated vector1 vector
+        .. note::
+            vector1 and vector2 must be 3d vectors
+    '''
+    basis = [np.array([1,0,0]),np.array([0,1,0]),np.array([0,0,1])][axis]
+    vector_u = np.cross(vector2, basis)
+    with np.errstate(divide='ignore', invalid='ignore'):
+        vector_u = vector_u / np.linalg.norm(vector_u, axis=1).reshape((-1,1))
+    angle = np.arccos(vector2.dot(basis) / np.linalg.norm(vector2, axis=1))
+    nulls = np.argwhere(np.isnan(angle))[:,0]
+    angle[nulls] = 0
+    # A unit vector version of the given vector
+    R = rotation_array_matrix(vector_u, angle)
+    rot = scipy.spatial.transform.Rotation.from_matrix(R)
+    # Rotate vector
+    rotated = rot.apply(vector1)
+    nulls = np.argwhere(np.isnan(rotated))[:,0]
+    rotated[nulls] = vector1[nulls]  # if norm == 0: return vector1
+    return rotated

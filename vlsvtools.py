@@ -107,6 +107,12 @@ class VLSVfile(Mapping):
 
         logger.info(f'Found VDF data in {len(self.__vdfcellids)} cells')
 
+        self._B = None
+        self._E = None
+        self._rho = None
+        self._V = None
+        self._P = None
+
         # preload all VDF cells
         self.__cells = {}
         for cellid in self.__vdfcellids:
@@ -148,20 +154,109 @@ class VLSVfile(Mapping):
     def mesh_size(self):
         return self.__mesh_size
 
+    def has_vlsv_var(self, varname):
+        return varname in self.handle.get_all_variables()
+
+    def read_vlsv_var(self, varname):
+        assert self.has_vlsv_var(varname)
+        return self.handle.read_variable(varname)
+
+    @property
+    def B(self):
+        if self._B is not None:
+            return self._B
+
+        if self.has_vlsv_var('B'):
+            self._B = self.read_vlsv_var('B')
+        elif self.has_vlsv_var('fg_b'):
+            self._B = self.read_vlsv_var('fg_b')
+
+        self._B = self._B[self.spatial_mesh.unsorted_cellids.argsort()]
+        return self._B
+
+    @property
+    def E(self):
+        if self._E is not None:
+            return self._E
+
+        if self.has_vlsv_var('E'):
+            self._E = self.read_vlsv_var('E')
+        elif self.has_var('fg_e'):
+            self._E = self.read_vlsv_var('fg_e')
+
+        self._E = self._E[self.spatial_mesh.unsorted_cellids.argsort()]
+        return self._E
+
+    @property
+    def rho(self):
+        if self._rho is not None:
+            return self._rho
+
+        if self.has_vlsv_var('rho'):
+            self._rho = self.read_vlsv_var('rho')
+        elif self.has_var(f'{self.populations[0]}/vg_rho'):
+            self._rho = self.read_vlsv_var(f'{self.populations[0]}/vg_rho')
+
+        self._rho = self._rho[self.spatial_mesh.unsorted_cellids.argsort()]
+        return self._rho
+
+    @property
+    def V(self):
+        if self._V is not None:
+            return self._V
+
+        if self.has_vlsv_var('rho_v'):
+            with np.errstate(divide='ignore', invalid='ignore'):
+                self._V = self.read_vlsv_var('rho_v') / self.read_vlsv_var('rho').reshape((-1,1))
+            self._V[np.isnan(self._V)] = 0
+        elif self.has_vlsv_var(f'{self.populations[0]}/vg_v'):
+            self._V = self.read_vlsv_var(f'{self.populations[0]}/vg_v')
+
+        self._V = self._V[self.spatial_mesh.unsorted_cellids.argsort()]
+        return self._V
+
+    @property
+    def P(self):
+        if self._P is not None:
+            return self._P
+
+        if self.has_vlsv_var('PTensorDiagonal'):
+            p_diag = self.read_vlsv_var('PTensorDiagonal')
+        elif self.has_vlsv_var(f'{self.populations[0]}/vg_ptensor_diagonal'):
+            p_diag = self.read_vlsv_var(f'{self.populations[0]}/vg_ptensor_diagonal')
+
+        if self.has_vlsv_var('PTensorOffDiagonal'):
+            p_offdiag = self.read_vlsv_var('PTensorOffDiagonal')
+        elif self.has_vlsv_var(f'{self.populations[0]}/vg_ptensor_offdiagonal'):
+            p_offdiag = self.read_vlsv_var(f'{self.populations[0]}/vg_ptensor_offdiagonal')
+
+        N = p_diag.shape[1]
+        P = np.expand_dims(p_diag, axis=1)
+        P = P*np.eye(N)
+        P[:,0,1] = p_offdiag[:,2]
+        P[:,0,2] = p_offdiag[:,1]
+        P[:,1,2] = p_offdiag[:,0]
+        P[:,1,0] = P[:,0,1]
+        P[:,2,0] = P[:,0,2]
+        P[:,2,1] = P[:,1,2]
+
+        self._P = P[self.spatial_mesh.unsorted_cellids.argsort()]
+        return self._P
+
+    def get_rho(self):
+        cellids = self.read_var('cellid')
+        ret = np.zeros([len(self), 4])
+        for i, cellid in enumerate(sorted(cellids)):
+            ret[i, :3] = self.handle.get_cell_coordinates(cellid)
+        rho = self.read_var(f'{self.populations[0]}/vg_rho')
+        ret[:, 3] = rho[cellids.argsort()]
+        return ret
+
     def get_vdf(self, cellid):
         return self[cellid].get_vdf()
 
     def has_vdf(self, cellid):
         return self[cellid].has_vdf
-
-    def get_rho(self):
-        cellids = self.handle.read_variable('cellid')
-        ret = np.zeros([len(self), 4])
-        for i, cellid in enumerate(sorted(cellids)):
-            ret[i, :3] = self.handle.get_cell_coordinates(cellid)
-        rho = self.handle.read_variable(f'{self.populations[0]}/vg_rho')
-        ret[:, 3] = rho[cellids.argsort()]
-        return ret
 
 
 class VLSVfiles(Mapping):
